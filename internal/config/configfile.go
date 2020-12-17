@@ -14,6 +14,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/hairyhenderson/gomplate/v3/internal/iohelpers"
+
 	"github.com/pkg/errors"
 	"gopkg.in/yaml.v3"
 )
@@ -52,7 +54,7 @@ type Config struct {
 	Context       map[string]DataSource `yaml:"context,omitempty"`
 	Plugins       map[string]string     `yaml:"plugins,omitempty"`
 	PluginTimeout time.Duration         `yaml:"pluginTimeout,omitempty"`
-	Templates     []string              `yaml:"templates,omitempty"`
+	Templates     Templates             `yaml:"templates,omitempty"`
 
 	// Extra HTTP headers not attached to pre-defined datsources. Potentially
 	// used by datasources defined in the template.
@@ -100,27 +102,79 @@ func mergeDataSources(d, o map[string]DataSource) map[string]DataSource {
 	return d
 }
 
+// Templates - mapping type for templates, can be unmarshaled from an array or map
+type Templates map[string]DataSource
+
+// UnmarshalYAML - satisfy the yaml.Umarshaler interface - Templates can be
+// provided as an array of key=value strings, or a map of string to datasources
+func (d *Templates) UnmarshalYAML(value *yaml.Node) (err error) {
+	*d = Templates{}
+
+	switch value.Kind {
+	case yaml.SequenceNode:
+		for _, item := range value.Content {
+			parts := strings.SplitN(item.Value, "=", 2)
+			ds := DataSource{}
+			alias := parts[0]
+			u, err := ParseSourceURL(parts[len(parts)-1])
+			if err != nil {
+				return fmt.Errorf("could not parse datasource URL from %+v: %w", parts, err)
+			}
+			ds.URL = u
+			(*d)[alias] = ds
+		}
+	case yaml.MappingNode:
+		m := map[string]DataSource{}
+		err = value.Decode(&m)
+		if err != nil {
+			return fmt.Errorf("failed to %s node: %w", value.Tag, err)
+		}
+		for k, v := range m {
+			(*d)[k] = v
+		}
+	default:
+		err = fmt.Errorf("cannot unmarshal unexpected type %s", value.Tag)
+	}
+
+	return err
+}
+
 // DataSource - datasource configuration
 type DataSource struct {
-	URL    *url.URL    `yaml:"-"`
-	Header http.Header `yaml:"header,omitempty,flow"`
+	URL    *url.URL
+	Header http.Header
 }
 
 // UnmarshalYAML - satisfy the yaml.Umarshaler interface - URLs aren't
 // well supported, and anyway we need to do some extra parsing
-func (d *DataSource) UnmarshalYAML(value *yaml.Node) error {
+func (d *DataSource) UnmarshalYAML(value *yaml.Node) (err error) {
 	type raw struct {
 		URL    string
 		Header http.Header
 	}
 	r := raw{}
-	err := value.Decode(&r)
-	if err != nil {
-		return err
+
+	if value.Kind == yaml.ScalarNode {
+		s := value.Value
+		parts := strings.SplitN(s, "=", 2)
+		if len(parts) == 2 {
+			r.URL = parts[1]
+		} else {
+			r.URL = s
+		}
+	} else {
+		err := value.Decode(&r)
+		if err != nil {
+			return err
+		}
 	}
-	u, err := ParseSourceURL(r.URL)
-	if err != nil {
-		return fmt.Errorf("could not parse datasource URL %q: %w", r.URL, err)
+
+	var u *url.URL
+	if r.URL != "" {
+		u, err = ParseSourceURL(r.URL)
+		if err != nil {
+			return fmt.Errorf("could not parse datasource URL %q: %w", r.URL, err)
+		}
 	}
 	*d = DataSource{
 		URL:    u,
@@ -134,7 +188,7 @@ func (d *DataSource) UnmarshalYAML(value *yaml.Node) error {
 func (d DataSource) MarshalYAML() (interface{}, error) {
 	type raw struct {
 		URL    string
-		Header http.Header
+		Header http.Header `yaml:",omitempty"`
 	}
 	r := raw{
 		URL:    d.URL.String(),
@@ -215,9 +269,7 @@ func (c *Config) MergeFrom(o *Config) *Config {
 	if !isZero(o.RDelim) {
 		c.RDelim = o.RDelim
 	}
-	if !isZero(o.Templates) {
-		c.Templates = o.Templates
-	}
+	mergeDataSources(c.Templates, o.Templates)
 	mergeDataSources(c.DataSources, o.DataSources)
 	mergeDataSources(c.Context, o.Context)
 	if len(o.Plugins) > 0 {
@@ -229,9 +281,42 @@ func (c *Config) MergeFrom(o *Config) *Config {
 	return c
 }
 
+// ParseHeaderFlags parses the key=value format flags from the command-line and
+// assigns the headers to the Context, DataSources, and Templates fields. This
+// should be called after these fields are populated. The ExtraHeaders field
+// will contain the unreferenced headers.
+func (c *Config) ParseHeaderFlags(headers []string) error {
+	hdrs, err := parseHeaderArgs(headers)
+	if err != nil {
+		return err
+	}
+
+	for k, v := range hdrs {
+		if d, ok := c.Context[k]; ok {
+			d.Header = v
+			c.Context[k] = d
+			delete(hdrs, k)
+		}
+		if d, ok := c.DataSources[k]; ok {
+			d.Header = v
+			c.DataSources[k] = d
+			delete(hdrs, k)
+		}
+		if t, ok := c.Templates[k]; ok {
+			t.Header = v
+			c.Templates[k] = t
+			delete(hdrs, k)
+		}
+	}
+	if len(hdrs) > 0 {
+		c.ExtraHeaders = hdrs
+	}
+	return nil
+}
+
 // ParseDataSourceFlags - sets the DataSources and Context fields from the
 // key=value format flags as provided at the command-line
-func (c *Config) ParseDataSourceFlags(datasources, contexts, headers []string) error {
+func (c *Config) ParseDataSourceFlags(datasources, contexts []string) error {
 	for _, d := range datasources {
 		k, ds, err := parseDatasourceArg(d)
 		if err != nil {
@@ -253,26 +338,23 @@ func (c *Config) ParseDataSourceFlags(datasources, contexts, headers []string) e
 		c.Context[k] = ds
 	}
 
-	hdrs, err := parseHeaderArgs(headers)
-	if err != nil {
-		return err
+	return nil
+}
+
+// ParseTemplateFlags - sets the Templates field from the
+// key=value format flags as provided at the command-line
+func (c *Config) ParseTemplateFlags(templates []string) error {
+	for _, d := range templates {
+		k, tpl, err := parseDatasourceArg(d)
+		if err != nil {
+			return err
+		}
+		if c.Templates == nil {
+			c.Templates = map[string]DataSource{}
+		}
+		c.Templates[k] = tpl
 	}
 
-	for k, v := range hdrs {
-		if d, ok := c.Context[k]; ok {
-			d.Header = v
-			c.Context[k] = d
-			delete(hdrs, k)
-		}
-		if d, ok := c.DataSources[k]; ok {
-			d.Header = v
-			c.DataSources[k] = d
-			delete(hdrs, k)
-		}
-	}
-	if len(hdrs) > 0 {
-		c.ExtraHeaders = hdrs
-	}
 	return nil
 }
 
@@ -477,9 +559,9 @@ func (c *Config) GetMode() (os.FileMode, bool, error) {
 	if err != nil {
 		return 0, false, err
 	}
-	mode := NormalizeFileMode(os.FileMode(m))
+	mode := iohelpers.NormalizeFileMode(os.FileMode(m))
 	if mode == 0 && c.Input != "" {
-		mode = NormalizeFileMode(0644)
+		mode = iohelpers.NormalizeFileMode(0644)
 	}
 	return mode, modeOverride, nil
 }
