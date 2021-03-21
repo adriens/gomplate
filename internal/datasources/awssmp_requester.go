@@ -26,11 +26,14 @@ type awssmpGetter interface {
 	GetParametersByPathWithContext(ctx context.Context, input *ssm.GetParametersByPathInput, opts ...request.Option) (*ssm.GetParametersByPathOutput, error)
 }
 
-func (r *awsSMPRequester) Request(ctx context.Context, u *url.URL, header http.Header) (*Response, error) {
+func (r *awsSMPRequester) Initialize(ctx context.Context) error {
 	if r.asmpg == nil {
 		r.asmpg = ssm.New(gaws.SDKSession())
 	}
+	return nil
+}
 
+func (r *awsSMPRequester) Request(ctx context.Context, u *url.URL, header http.Header) (*Response, error) {
 	resp := &Response{}
 	ct := jsonMimetype
 

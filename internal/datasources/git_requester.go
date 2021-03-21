@@ -28,6 +28,10 @@ import (
 
 type gitRequester struct{}
 
+func (r *gitRequester) Initialize(ctx context.Context) error {
+	return nil
+}
+
 func (r *gitRequester) Request(ctx context.Context, u *url.URL, header http.Header) (*Response, error) {
 	depth := 1
 	if u.Scheme == "git+file" {

@@ -55,13 +55,13 @@ func FileSystemFromContext(ctx context.Context) afero.Fs {
 	return fs
 }
 
-// WithDataSources injects the given afero.Fs into the context for later
+// WithDataSources injects the given datasource map into the context for later
 // retrieval with DataSourcesFromContext.
 func WithDataSources(ctx context.Context, ds map[string]DataSource) context.Context {
 	return context.WithValue(ctx, dsKey{}, ds)
 }
 
-// DataSourcesFromContext returns the afero.Fs previously injected into the
+// DataSourcesFromContext returns the datasource map previously injected into the
 // given context with WithDataSources. If none is found, nil is
 // returned.
 func DataSourcesFromContext(ctx context.Context) map[string]DataSource {

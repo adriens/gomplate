@@ -16,6 +16,12 @@ type vaultRequester struct {
 	vc *vault.Vault
 }
 
+func (r *vaultRequester) Initialize(ctx context.Context) error {
+	// we can't initialize vault here - needs a URL (which is bad - means this
+	// only supports a single Vault server)
+	return nil
+}
+
 func (r *vaultRequester) Request(ctx context.Context, u *url.URL, header http.Header) (resp *Response, err error) {
 	if r.vc == nil {
 		r.vc, err = vault.New(u)

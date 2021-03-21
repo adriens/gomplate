@@ -16,6 +16,13 @@ type consulRequester struct {
 	kv map[string]kvStore
 }
 
+func (r *consulRequester) Initialize(ctx context.Context) error {
+	if r.kv == nil {
+		r.kv = map[string]kvStore{}
+	}
+	return nil
+}
+
 // kvStore -
 type kvStore interface {
 	Login() error

@@ -6,7 +6,7 @@ import (
 
 	. "gopkg.in/check.v1"
 
-	"github.com/hairyhenderson/gomplate/v3/internal/config"
+	"github.com/hairyhenderson/gomplate/v3/internal/iohelpers"
 	tassert "github.com/stretchr/testify/assert"
 	"gotest.tools/v3/assert"
 	"gotest.tools/v3/fs"
@@ -70,7 +70,7 @@ func (s *InputDirSuite) TestInputDir(c *C) {
 	for _, v := range testdata {
 		info, err := os.Stat(v.path)
 		assert.NilError(c, err)
-		m := config.NormalizeFileMode(v.mode)
+		m := iohelpers.NormalizeFileMode(v.mode)
 		assert.Equal(c, m, info.Mode(), v.path)
 		content, err := ioutil.ReadFile(v.path)
 		assert.NilError(c, err)
@@ -108,7 +108,7 @@ func (s *InputDirSuite) TestInputDirWithModeOverride(c *C) {
 	for _, v := range testdata {
 		info, err := os.Stat(v.path)
 		assert.NilError(c, err)
-		m := config.NormalizeFileMode(v.mode)
+		m := iohelpers.NormalizeFileMode(v.mode)
 		assert.Equal(c, m, info.Mode(), v.path)
 		content, err := ioutil.ReadFile(v.path)
 		assert.NilError(c, err)
@@ -145,7 +145,7 @@ func (s *InputDirSuite) TestOutputMapInline(c *C) {
 	for _, v := range testdata {
 		info, err := os.Stat(v.path)
 		assert.NilError(c, err)
-		m := config.NormalizeFileMode(v.mode)
+		m := iohelpers.NormalizeFileMode(v.mode)
 		assert.Equal(c, m, info.Mode(), v.path)
 		content, err := ioutil.ReadFile(v.path)
 		assert.NilError(c, err)
@@ -184,7 +184,7 @@ func (s *InputDirSuite) TestOutputMapExternal(c *C) {
 	for _, v := range testdata {
 		info, err := os.Stat(v.path)
 		assert.NilError(c, err)
-		m := config.NormalizeFileMode(v.mode)
+		m := iohelpers.NormalizeFileMode(v.mode)
 		assert.Equal(c, m, info.Mode(), v.path)
 		content, err := ioutil.ReadFile(v.path)
 		assert.NilError(c, err)
@@ -255,7 +255,7 @@ func (s *InputDirSuite) TestInputDirCwd(c *C) {
 	for _, v := range testdata {
 		info, err := os.Stat(v.path)
 		assert.NilError(c, err)
-		m := config.NormalizeFileMode(v.mode)
+		m := iohelpers.NormalizeFileMode(v.mode)
 		assert.Equal(c, m, info.Mode(), v.path)
 		content, err := ioutil.ReadFile(v.path)
 		assert.NilError(c, err)

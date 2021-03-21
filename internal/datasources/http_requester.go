@@ -16,7 +16,7 @@ type httpRequester struct {
 	hc *http.Client
 }
 
-func (r *httpRequester) Request(ctx context.Context, u *url.URL, header http.Header) (*Response, error) {
+func (r *httpRequester) Initialize(ctx context.Context) error {
 	if r.hc == nil {
 		r.hc = config.HTTPClientFromContext(ctx)
 		if r.hc == http.DefaultClient {
@@ -24,6 +24,10 @@ func (r *httpRequester) Request(ctx context.Context, u *url.URL, header http.Hea
 		}
 	}
 
+	return nil
+}
+
+func (r *httpRequester) Request(ctx context.Context, u *url.URL, header http.Header) (*Response, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
 	if err != nil {
 		return nil, err

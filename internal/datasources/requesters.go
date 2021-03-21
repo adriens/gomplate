@@ -1,6 +1,7 @@
 package datasources
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/hairyhenderson/gomplate/v3/internal/config"
@@ -54,8 +55,11 @@ func registerRequesters() {
 	requesters["git+ssh"] = g
 }
 
-func lookupRequester(scheme string) (requester, error) {
+func lookupRequester(ctx context.Context, scheme string) (requester, error) {
 	if requester, ok := requesters[scheme]; ok {
+		if err := requester.Initialize(ctx); err != nil {
+			return nil, err
+		}
 		return requester, nil
 	}
 	return nil, fmt.Errorf("no requester found for scheme %s (not registered?)", scheme)

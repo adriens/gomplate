@@ -14,6 +14,13 @@ type boltDBRequester struct {
 	kv map[string]kvStore
 }
 
+func (r *boltDBRequester) Initialize(ctx context.Context) error {
+	if r.kv == nil {
+		r.kv = map[string]kvStore{}
+	}
+	return nil
+}
+
 func storeKey(u *url.URL) string {
 	k := *u
 	k.RawQuery = ""
@@ -21,13 +28,14 @@ func storeKey(u *url.URL) string {
 }
 
 func (r *boltDBRequester) Request(ctx context.Context, u *url.URL, header http.Header) (resp *Response, err error) {
-	kv, ok := r.kv[storeKey(u)]
+	k := storeKey(u)
+	kv, ok := r.kv[k]
 	if !ok {
 		kv, err = libkv.NewBoltDB(u)
 		if err != nil {
 			return nil, err
 		}
-		r.kv[storeKey(u)] = kv
+		r.kv[k] = kv
 	}
 
 	key := u.Query().Get("key")

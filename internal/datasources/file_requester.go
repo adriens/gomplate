@@ -20,17 +20,21 @@ type fileRequester struct {
 	fs afero.Fs
 }
 
-func (r *fileRequester) Request(ctx context.Context, u *url.URL, header http.Header) (*Response, error) {
-	fs := config.FileSystemFromContext(ctx)
-	if fs == nil {
-		if r.fs == nil {
-			r.fs = afero.NewOsFs()
+func (r *fileRequester) Initialize(ctx context.Context) error {
+	if r.fs == nil {
+		fs := config.FileSystemFromContext(ctx)
+		if fs == nil {
+			fs = afero.NewOsFs()
 		}
-		fs = r.fs
+		r.fs = fs
 	}
+	return nil
+}
+
+func (r *fileRequester) Request(ctx context.Context, u *url.URL, header http.Header) (*Response, error) {
 	p := filepath.FromSlash(u.Path)
 	// make sure we can access the file
-	i, err := fs.Stat(p)
+	i, err := r.fs.Stat(p)
 	if err != nil {
 		return nil, fmt.Errorf("failed to stat %q: %w", p, err)
 	}
@@ -45,14 +49,14 @@ func (r *fileRequester) Request(ctx context.Context, u *url.URL, header http.Hea
 	hint := ""
 	if i.IsDir() {
 		hint = jsonArrayMimetype
-		b, err := r.readFileDir(ctx, fs, p)
+		b, err := r.readFileDir(ctx, r.fs, p)
 		if err != nil {
 			return nil, fmt.Errorf("failed to list directory %q: %w", p, err)
 		}
 		resp.ContentLength = int64(len(b))
 		resp.Body = ioutil.NopCloser(bytes.NewReader(b))
 	} else {
-		resp.Body, err = fs.OpenFile(p, os.O_RDONLY, 0)
+		resp.Body, err = r.fs.OpenFile(p, os.O_RDONLY, 0)
 		if err != nil {
 			return nil, fmt.Errorf("can't open %q: %w", p, err)
 		}

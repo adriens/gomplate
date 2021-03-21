@@ -23,6 +23,10 @@ import (
 
 type blobRequester struct{}
 
+func (r *blobRequester) Initialize(ctx context.Context) error {
+	return nil
+}
+
 func (r *blobRequester) Request(ctx context.Context, u *url.URL, header http.Header) (*Response, error) {
 	key := u.Path
 

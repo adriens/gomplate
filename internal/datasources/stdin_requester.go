@@ -13,11 +13,14 @@ type stdinRequester struct {
 	stdin io.Reader
 }
 
-func (r *stdinRequester) Request(ctx context.Context, u *url.URL, header http.Header) (resp *Response, err error) {
+func (r *stdinRequester) Initialize(ctx context.Context) error {
 	if r.stdin == nil {
 		r.stdin = os.Stdin
 	}
+	return nil
+}
 
+func (r *stdinRequester) Request(ctx context.Context, u *url.URL, header http.Header) (resp *Response, err error) {
 	resp = &Response{
 		// Even though os.Stdin is actually an io.ReadCloser, wrap with
 		// NopCloser. Closing os.Stdin has undesired side-effects.

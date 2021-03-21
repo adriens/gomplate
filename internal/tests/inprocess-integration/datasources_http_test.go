@@ -1,83 +1,83 @@
 package integration
 
 import (
-	"net"
 	"net/http"
+	"net/http/httptest"
 
 	. "gopkg.in/check.v1"
 )
 
 type DatasourcesHTTPSuite struct {
-	l *net.TCPListener
+	srv *httptest.Server
+	url string
 }
 
 var _ = Suite(&DatasourcesHTTPSuite{})
 
 func (s *DatasourcesHTTPSuite) SetUpSuite(c *C) {
-	var err error
-	s.l, err = net.ListenTCP("tcp", &net.TCPAddr{IP: net.ParseIP("127.0.0.1")})
-	handle(c, err)
+	mux := http.NewServeMux()
+	s.srv = httptest.NewServer(mux)
+	s.url = s.srv.URL
 
-	http.HandleFunc("/mirror", mirrorHandler)
-	http.HandleFunc("/not.json", typeHandler("application/yaml", "value: notjson\n"))
-	http.HandleFunc("/foo", typeHandler("application/json", `{"value": "json"}`))
-	http.HandleFunc("/actually.json", typeHandler("", `{"value": "json"}`))
-	http.HandleFunc("/bogus.csv", typeHandler("text/plain", `{"value": "json"}`))
-	http.HandleFunc("/list", typeHandler("application/array+json", `[1, 2, 3, 4, 5]`))
-	go http.Serve(s.l, nil)
+	mux.HandleFunc("/mirror", mirrorHandler)
+	mux.HandleFunc("/not.json", typeHandler("application/yaml", "value: notjson\n"))
+	mux.HandleFunc("/foo", typeHandler("application/json", `{"value": "json"}`))
+	mux.HandleFunc("/actually.json", typeHandler("", `{"value": "json"}`))
+	mux.HandleFunc("/bogus.csv", typeHandler("text/plain", `{"value": "json"}`))
+	mux.HandleFunc("/list", typeHandler("application/array+json", `[1, 2, 3, 4, 5]`))
 }
 
 func (s *DatasourcesHTTPSuite) TearDownSuite(c *C) {
-	s.l.Close()
+	s.srv.Close()
 }
 
 func (s *DatasourcesHTTPSuite) TestHTTPDatasource(c *C) {
 	o, e, err := cmdTest(c,
-		"-d", "foo=http://"+s.l.Addr().String()+"/mirror",
+		"-d", "foo="+s.url+"/mirror",
 		"-H", "foo=Foo:bar",
 		"-i", "{{ index (ds `foo`).headers.Foo 0 }}")
 	assertSuccess(c, o, e, err, "bar")
 
 	o, e, err = cmdTest(c,
 		"-H", "foo=Foo:bar",
-		"-i", "{{defineDatasource `foo` `http://"+s.l.Addr().String()+"/mirror`}}{{ index (ds `foo`).headers.Foo 0 }}")
+		"-i", "{{defineDatasource `foo` `"+s.url+"/mirror`}}{{ index (ds `foo`).headers.Foo 0 }}")
 	assertSuccess(c, o, e, err, "bar")
 
 	o, e, err = cmdTest(c,
-		"-i", "{{ $d := ds `http://"+s.l.Addr().String()+"/mirror`}}{{ index (index $d.headers `Accept-Encoding`) 0 }}")
+		"-i", "{{ $d := ds `"+s.url+"/mirror`}}{{ index (index $d.headers `Accept-Encoding`) 0 }}")
 	assertSuccess(c, o, e, err, "gzip")
 }
 
 func (s *DatasourcesHTTPSuite) TestTypeOverridePrecedence(c *C) {
 	o, e, err := cmdTest(c,
-		"-d", "foo=http://"+s.l.Addr().String()+"/foo",
+		"-d", "foo="+s.url+"/foo",
 		"-i", "{{ (ds `foo`).value }}")
 	assertSuccess(c, o, e, err, "json")
 
 	o, e, err = cmdTest(c,
-		"-d", "foo=http://"+s.l.Addr().String()+"/not.json",
+		"-d", "foo="+s.url+"/not.json",
 		"-i", "{{ (ds `foo`).value }}")
 	assertSuccess(c, o, e, err, "notjson")
 
 	o, e, err = cmdTest(c,
-		"-d", "foo=http://"+s.l.Addr().String()+"/actually.json",
+		"-d", "foo="+s.url+"/actually.json",
 		"-i", "{{ (ds `foo`).value }}")
 	assertSuccess(c, o, e, err, "json")
 
 	o, e, err = cmdTest(c,
-		"-d", "foo=http://"+s.l.Addr().String()+"/bogus.csv?type=application/json",
+		"-d", "foo="+s.url+"/bogus.csv?type=application/json",
 		"-i", "{{ (ds `foo`).value }}")
 	assertSuccess(c, o, e, err, "json")
 
 	o, e, err = cmdTest(c,
-		"-c", ".=http://"+s.l.Addr().String()+"/list?type=application/array+json",
+		"-c", ".="+s.url+"/list?type=application/array+json",
 		"-i", "{{ range . }}{{ . }}{{ end }}")
 	assertSuccess(c, o, e, err, "12345")
 }
 
 func (s *DatasourcesHTTPSuite) TestAppendQueryAfterSubPaths(c *C) {
 	o, e, err := cmdTest(c,
-		"-d", "foo=http://"+s.l.Addr().String()+"/?type=application/json",
+		"-d", "foo="+s.url+"/?type=application/json",
 		"-i", "{{ (ds `foo` `bogus.csv`).value }}")
 	assertSuccess(c, o, e, err, "json")
 }

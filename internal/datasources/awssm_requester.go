@@ -19,6 +19,13 @@ type awsSecretsManagerRequester struct {
 	awsSecretsManager awsSecretsManagerGetter
 }
 
+func (r *awsSecretsManagerRequester) Initialize(ctx context.Context) error {
+	if r.awsSecretsManager == nil {
+		r.awsSecretsManager = secretsmanager.New(gaws.SDKSession())
+	}
+	return nil
+}
+
 func (r *awsSecretsManagerRequester) Request(ctx context.Context, u *url.URL, header http.Header) (*Response, error) {
 	if r.awsSecretsManager == nil {
 		r.awsSecretsManager = secretsmanager.New(gaws.SDKSession())

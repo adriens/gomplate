@@ -28,6 +28,11 @@ type mergeRequester struct {
 	ds map[string]config.DataSource
 }
 
+func (r *mergeRequester) Initialize(ctx context.Context) error {
+	// we can't initialize the datasources here as they may be modified
+	return nil
+}
+
 func (r *mergeRequester) Request(ctx context.Context, u *url.URL, header http.Header) (*Response, error) {
 	opaque := u.Opaque
 	parts := strings.Split(opaque, "|")

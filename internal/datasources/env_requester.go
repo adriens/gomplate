@@ -13,6 +13,10 @@ import (
 
 type envRequester struct{}
 
+func (r *envRequester) Initialize(ctx context.Context) error {
+	return nil
+}
+
 func (r *envRequester) Request(ctx context.Context, u *url.URL, header http.Header) (*Response, error) {
 	n := u.Path
 	n = strings.TrimPrefix(n, "/")

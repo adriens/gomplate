@@ -13,6 +13,11 @@ import (
 // requester is the interface that wraps the Request method. Implementations
 // will not typically support many different URL schemes.
 type requester interface {
+	// Initialize the Requester. This method must be idempotent - it may be
+	// called many times.
+	Initialize(ctx context.Context) error
+
+	// Request some data from a datasource
 	Request(ctx context.Context, url *url.URL, header http.Header) (*Response, error)
 }
 
@@ -55,7 +60,7 @@ func Request(ctx context.Context, d config.DataSource, args ...string) (*Respons
 		return nil, err
 	}
 
-	rdr, err := lookupRequester(u.Scheme)
+	rdr, err := lookupRequester(ctx, u.Scheme)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find requester for %s: %w", u, err)
 	}
