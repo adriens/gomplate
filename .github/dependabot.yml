@@ -1,0 +1,31 @@
+version: 2
+updates:
+- package-ecosystem: gomod
+  directory: "/"
+  schedule:
+    interval: weekly
+    time: "18:00"
+  open-pull-requests-limit: 10
+  ignore:
+  - dependency-name: github.com/aws/aws-sdk-go
+    versions:
+    - 1.38.13
+    - 1.38.18
+    - 1.38.2
+    - 1.38.22
+    - 1.38.8
+- package-ecosystem: docker
+  directory: "/"
+  schedule:
+    interval: weekly
+    time: "18:00"
+  open-pull-requests-limit: 10
+  ignore:
+  - dependency-name: alpine
+    versions:
+    - 3.13.3
+    - 3.13.4
+  - dependency-name: vault
+    versions:
+    - 1.6.3
+    - 1.7.0
